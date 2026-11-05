@@ -1,0 +1,9 @@
+# Secretos: nunca versionar la license key ni ningún .env real.
+.env
+*.env
+!.env.example
+
+# Artefactos del agente si alguien lo descarga localmente para probar.
+newrelic-java.zip
+newrelic/
+newrelic_agent.log

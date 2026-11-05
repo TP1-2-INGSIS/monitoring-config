@@ -1,0 +1,100 @@
+# =============================================================================
+# newrelic.yml — configuración base compartida del agente Java de New Relic
+# =============================================================================
+# Este archivo es el BASELINE común a todos los servicios. Se hornea dentro de
+# la imagen base (ver Dockerfile). Todo lo que varía por servicio o es secreto
+# NO se pone acá: se inyecta por variable de entorno, que siempre tiene
+# precedencia sobre este archivo.
+#
+#   license_key  -> NEW_RELIC_LICENSE_KEY   (secreto, runtime, NUNCA en el repo)
+#   app_name     -> NEW_RELIC_APP_NAME      (distinto por servicio)
+#
+# Referencia completa:
+# https://docs.newrelic.com/docs/apm/agents/java-agent/configuration/java-agent-configuration-config-file/
+# =============================================================================
+
+common: &default_settings
+
+  # ---------------------------------------------------------------------------
+  # Credenciales / identidad
+  # ---------------------------------------------------------------------------
+  # Se dejan vacíos a propósito: los provee cada servicio por entorno.
+  # Dejar la license key hardcodeada acá sería filtrar un secreto al repo.
+  license_key: ''
+  app_name: My Application
+
+  # ---------------------------------------------------------------------------
+  # Logs del propio agente
+  # ---------------------------------------------------------------------------
+  # STDOUT para que los logs del agente salgan por la salida estándar del
+  # contenedor (lo normal en Docker/compose). Override con NEW_RELIC_LOG_FILE_NAME.
+  log_level: info
+  log_file_name: STDOUT
+
+  # Reenvío automático de los logs de la aplicación a New Relic (logs in context).
+  application_logging:
+    enabled: true
+    forwarding:
+      enabled: true
+      max_samples_stored: 10000
+    metrics:
+      enabled: true
+    local_decorating:
+      enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Trazas distribuidas — propagación de contexto entre servicios
+  # (Snippets -> Assets -> Language, etc.). Clave en una arquitectura de micros.
+  # ---------------------------------------------------------------------------
+  distributed_tracing:
+    enabled: true
+
+  span_events:
+    enabled: true
+    max_samples_stored: 2000
+
+  # ---------------------------------------------------------------------------
+  # Transaction tracer — detalle de transacciones lentas y SQL.
+  # ---------------------------------------------------------------------------
+  transaction_tracer:
+    enabled: true
+    transaction_threshold: apdex_f
+    record_sql: obfuscated        # nunca 'raw' en entornos reales: ofusca valores de SQL
+    stack_trace_threshold: 0.5
+    explain_enabled: true
+    explain_threshold: 0.5
+
+  # ---------------------------------------------------------------------------
+  # Errores
+  # ---------------------------------------------------------------------------
+  error_collector:
+    enabled: true
+    # Códigos HTTP que NO se cuentan como error (ej. 404 esperados).
+    ignore_status_codes: 404
+
+  # ---------------------------------------------------------------------------
+  # Varios
+  # ---------------------------------------------------------------------------
+  # Permite leer configuración desde variables de entorno NEW_RELIC_*.
+  # (habilitado por defecto en versiones recientes; explícito para claridad)
+  high_security: false
+  send_data_on_exit: true
+  audit_mode: false
+
+# -----------------------------------------------------------------------------
+# Entornos. El agente usa 'production' salvo que se indique otro con
+# NEW_RELIC_ENVIRONMENT. Todos heredan de common (&default_settings).
+# -----------------------------------------------------------------------------
+development:
+  <<: *default_settings
+  log_level: finer
+
+test:
+  <<: *default_settings
+
+staging:
+  <<: *default_settings
+  app_name: My Application (Staging)
+
+production:
+  <<: *default_settings
