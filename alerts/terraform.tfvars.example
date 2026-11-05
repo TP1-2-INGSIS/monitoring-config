@@ -1,0 +1,13 @@
+# Copiá a terraform.tfvars (gitignorado) y completá.
+# account_id y api_key tambien se pueden pasar por entorno:
+#   export TF_VAR_account_id=1234567
+#   export TF_VAR_api_key=NRAK-xxxxxxxx
+
+account_id = 1234567
+api_key    = "NRAK-xxxxxxxxxxxxxxxxxxxx"   # User API key, NO la license key
+region     = "US"
+
+app_name                 = "assets"
+fivexx_threshold         = 5     # la "X": 5xx por encima de esto dispara la alerta
+error_rate_threshold_pct = 5
+notification_emails      = ["equipo@example.com"]

@@ -30,6 +30,8 @@ de los servicios (`Assets`, `Snippets`, `Language`, `Permissions`) la
 | `Dockerfile`    | Construye la imagen base compartida con el agente ya enganchado.    |
 | `newrelic.yml`  | Configuración baseline del agente (común a todos los servicios).    |
 | `.env.example`  | Plantilla de las variables de entorno (la license key es secreta).  |
+| `.github/workflows/cd.yml` | CD: publica la imagen base a GHCR.                       |
+| `alerts/`       | Alertas de New Relic como código (Terraform).                       |
 | `docs/plan.md`  | Decisión de arquitectura (por qué New Relic y no Grafana).          |
 
 ## Cómo funciona
@@ -107,8 +109,47 @@ Eso es todo: ~3 líneas por servicio, cero cambios de código.
 Si no aparece nada tras cinco minutos, revisá los logs del contenedor (el agente
 escribe a STDOUT) y confirmá que la license key llegó.
 
-## Notas de seguridad
+## Publicar la imagen (CD)
 
+El workflow `.github/workflows/cd.yml` publica la imagen base a GHCR, siguiendo
+el mismo patrón que el CD de `Assets`:
+
+- Se dispara en push a `main`, en tags `v*`, o manualmente (`workflow_dispatch`).
+- Login a GHCR con el `GITHUB_TOKEN` del repo.
+- `docker/build-push-action` construye y pushea.
+- Tags: siempre `:latest`; si el push es un tag `vX.Y.Z`, también publica `:X.Y.Z`
+  para que los servicios puedan fijar una versión concreta.
+
+No hay pasos de Gradle/`bootJar` como en Assets: este repo solo construye la
+imagen base, no compila una app.
+
+## Alertas (New Relic como código)
+
+El TP pide **al menos 3 alertas**. Están definidas como código con Terraform en
+`alerts/main.tf`, sobre métricas que el agente APM ya reporta:
+
+1. **Exceso de respuestas 5xx** — conteo absoluto de transacciones con status
+   `5xx`. Se dispara al superar `fivexx_threshold` (la "X", por defecto 5) en 5
+   minutos.
+2. **Error rate (%) alto** — proporción de transacciones con error sobre el
+   total. Capta degradación con cualquier volumen de tráfico.
+3. **Latencia p95 alta** — el p95 de la duración de las transacciones web supera
+   el umbral (por defecto 2s). Detecta lentitud aunque los status sean 200.
+
+Aplicarlas (una policy por servicio, pasando su `app_name`):
+
+```bash
+cd alerts
+export TF_VAR_account_id=1234567
+export TF_VAR_api_key=NRAK-xxxx        # User API key, NO la license key
+terraform init
+terraform apply -var 'app_name=assets'
+```
+
+Los umbrales son variables (`fivexx_threshold`, `error_rate_threshold_pct`), así
+que se ajustan sin tocar el código. Ver `alerts/terraform.tfvars.example`.
+
+## Notas de seguridad
 - La **license key nunca va al repo**. Vive en `.env` (gitignorado) en local y
   como *secret* del pipeline en CI/CD.
 - `record_sql` está en `obfuscated` en el `newrelic.yml`: no se envían valores

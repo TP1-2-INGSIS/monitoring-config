@@ -7,3 +7,11 @@
 newrelic-java.zip
 newrelic/
 newrelic_agent.log
+
+# Terraform (alertas): estado y secretos nunca al repo.
+alerts/.terraform/
+alerts/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+!terraform.tfvars.example

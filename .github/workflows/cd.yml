@@ -1,0 +1,54 @@
+name: CD
+
+# Publica la imagen base de monitoreo (New Relic Java APM) a GHCR.
+# El resto de los servicios la importan con `FROM ghcr.io/<repo>:<tag>`.
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      # Tags: siempre `latest`. Si el push es un tag vX.Y.Z, también publica
+      # esa versión concreta para que los servicios puedan fijarla.
+      - name: Compute tags
+        id: tags
+        run: |
+          IMAGE="${{ steps.image.outputs.name }}"
+          TAGS="$IMAGE:latest"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAGS="$TAGS,$IMAGE:${GITHUB_REF_NAME#v}"
+          fi
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
